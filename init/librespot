@@ -1,0 +1,53 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          librespot
+# Required-Start:    networking
+# Required-Stop:
+# Default-Start:     2 3
+# Default-Stop:
+# Short-Description: Start or stop librespot.
+# Description:       Starts or stops the librespot program
+### END INIT INFO
+
+DAEMON=/usr/local/bin/librespot
+[ -x "$DAEMON" ] || exit 0
+NAME=librespot
+DESC="spotify library"
+LIBRESPOT_OPTS="--name Philips --device-type speaker --backend alsa --bitrate 160 --format S16 --disable-audio-cache --volume-ctrl linear --initial-volume 90 --autoplay --onevent /opt/lcdworks/bin/librespot-events.py"
+. /lib/init/vars.sh
+
+. /lib/lsb/init-functions
+
+case "$1" in
+  start)
+    log_use_fancy_output
+    mydevid=$(aplay -l | egrep -e '^card [0-9]' | grep USB| cut -d ':' -f 1 | cut -d ' ' -f 2)
+	log_daemon_msg "Starting $DESC" "$NAME"
+    if [ "$mydevid" != "" ];then
+        start-stop-daemon --start -m --quiet -b --output /var/log/$NAME.log --pidfile /var/run/$NAME --exec $DAEMON -- \
+            $LIBRESPOT_OPTS --device plughw:${mydevid},0
+    else
+        ls /alo > /dev/null 2>&1
+    fi
+	log_end_msg $?
+	;;
+  stop)
+	log_daemon_msg "Stopping $DESC" "$NAME"
+	[ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
+	start-stop-daemon --oknodo --stop --quiet --remove-pidfile --pidfile /var/run/$NAME --exec $DAEMON
+	log_end_msg $?
+	;;
+  restart|force-reload)
+	"$0" stop
+	"$0" start
+	;;
+  status)
+	status_of_proc "$DAEMON" "$NAME" && exit 0 || exit $?
+	;;
+  *)
+	echo "Usage: $SCRIPTNAME {start|stop|restart|force-reload|status}" >&2
+	exit 3
+	;;
+esac
+
+:
