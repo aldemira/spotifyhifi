@@ -32,9 +32,9 @@ def long_string(display, text='', num_line=1, num_cols=16):
 
 
 def get_token():
-    creds = []
+    creds = {}
     with open(root_path + '/conf/spotify.json', 'r') as f:
-        creds = json.loads(f.read())[0]
+        creds = json.loads(f.read())
     client_id = creds['client_id']
     client_secret = creds['client_secret']
 
@@ -145,6 +145,7 @@ elif player_event in ['playing', 'changed', 'started']:
 
     display.lcd_backlight(1) 
     long_string(display,artist.rstrip(),1)
+    sleep(0.2)
     #long_string(display,spot_res['album']['name'],2)
     long_string(display,spot_res['name'],2)
 
