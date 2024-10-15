@@ -1,0 +1,46 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          lcdops
+# Required-Start:    librespot
+# Required-Stop:
+# Default-Start:     2 3
+# Default-Stop: 0 6
+# Short-Description: Start or stop librespot.
+# Description:       Starts or stops the lcdops program
+### END INIT INFO
+
+LCDWORKSDIR=/opt/lcdworks/bin/
+EXECNAME=lcdmanager.py
+DAEMON=${LCDWORKSDIR}${EXECNAME}
+[ -x "$DAEMON" ] || exit 0
+NAME=lcdops
+DESC="aldemir HiFi lcdops"
+. /lib/init/vars.sh
+
+. /lib/lsb/init-functions
+
+case "$1" in
+  start)
+    #log_use_fancy_output
+	log_daemon_msg "Starting $DESC" "$NAME"
+    #start-stop-daemon --start --quiet --pidfile /var/run/$NAME --exec $DAEMON
+    start-stop-daemon --start --pidfile /var/run/${EXECNAME}.pid --exec $DAEMON
+	log_end_msg $?
+	;;
+  stop)
+    log_use_fancy_output
+	log_daemon_msg "Stopping $DESC" "$NAME"
+	start-stop-daemon --stop --quite --pidfile /var/run/${EXECNAME}.pid
+	log_end_msg $?
+	;;
+  restart|force-reload)
+	"$0" stop
+	"$0" start
+	;;
+  *)
+	echo "Usage: $SCRIPTNAME {start|stop|restart}" >&2
+	exit 3
+	;;
+esac
+
+:
