@@ -5,32 +5,11 @@ import requests
 import logging
 from logging import config
 from base64 import urlsafe_b64encode
-from time import sleep
 import json
 root_path = '/opt/lcdworks'
-sys.path.append(os.path.abspath(root_path + '/lib'))
-# Get this from https://github.com/the-raspberry-pi-guy/lcd
-import drivers
+import socket
 
 ################# HELPER FUNCTIONS ########################
-def long_string(display, text='', num_line=1, num_cols=16):
-    """
-    Parameters: (driver, string to print, number of line to print, number of columns of your display)
-    Return: This function send to display your scrolling string.
-    """
-    if len(text) > num_cols:
-        display.lcd_display_string(text[:num_cols], num_line)
-        sleep(1)
-        for i in range(len(text) - num_cols + 1):
-            text_to_print = text[i:i+num_cols]
-            display.lcd_display_string(text_to_print, num_line)
-            sleep(0.2)
-        display.lcd_display_string(text[:num_cols], num_line)
-        sleep(1)
-    else:
-        display.lcd_display_string(text, num_line)
-
-
 def get_token():
     creds = {}
     with open(root_path + '/conf/spotify.json', 'r') as f:
@@ -87,11 +66,11 @@ LOGGING = {
             },
         },
     'handlers': {
-        #'stdout': {
-        #    'class': 'logging.StreamHandler',
-        #    'stream': sys.stdout,
-        #    'formatter': 'verbose',
-        #    },
+        'stdout': {
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout,
+            'formatter': 'verbose',
+            },
         'daemon': {
             'class': 'logging.handlers.SysLogHandler',
             'address': '/dev/log',
@@ -101,7 +80,7 @@ LOGGING = {
         },
     'loggers': {
         'librespot-events': {
-            'handlers': ['daemon',],
+            'handlers': ['daemon', 'sysout'],
             'level': logging.INFO,
             'propagate': True,
             },
@@ -110,22 +89,25 @@ LOGGING = {
 
 config.dictConfig(LOGGING)
 logger = logging.getLogger("librespot-events")
-
 player_event = os.getenv('PLAYER_EVENT')
 if not player_event:
     print('Please provide an event!')
     logger.error('Please provide an event!')
     sys.exit(1)
+# create a socket object
+sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
+# connect to the Unix domain socket server
+server_address = '/var/run/lcdmanager.py'
+
+try:
+    sock.connect(server_address)
+except:
+    logger.exception("Can't connect")
 
 if player_event in ['stopped', 'paused']:
-    display = drivers.Lcd()
-    display.lcd_backlight(0) 
-    display.lcd_clear()
-    display.lcd_display_string('Aldemir HiFi!',1)
-    display.lcd_display_string('Stopped...',2)
+    sock.sendall('["Aldemir HiFi","Stopped..."]')
 elif player_event in ['playing', 'changed', 'started']:
-    display = drivers.Lcd()
     cur_track = os.environ['TRACK_ID']
     logger.info('New track: ' + cur_track)
 
@@ -143,13 +125,20 @@ elif player_event in ['playing', 'changed', 'started']:
     for i in spot_res['album']['artists']:
         artist = artist + i['name'] + ' '
 
-    display.lcd_backlight(1) 
-    long_string(display,artist.rstrip(),1)
-    sleep(0.2)
-    #long_string(display,spot_res['album']['name'],2)
-    long_string(display,spot_res['name'],2)
+    #long_string(display,artist.rstrip(),1)
+    #long_string(display,spot_res['name'],2)
+    sock.sendall('["%s","%s"]' % (artist.rstrip(), spot_res['name']))
 
 elif player_event in ['preloading']:
     pass
 else:
     logger.debug('Received unhandled event')
+
+# receive data from the server
+received_data = sock.recv(1024)
+
+# close the socket
+sock.close()
+
+# process the received data
+print(received_data.decode())
