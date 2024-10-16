@@ -4,7 +4,6 @@ import sys,os
 sys.path.append(os.path.abspath("/opt/lcdworks/lib"))
 # Get this from https://github.com/the-raspberry-pi-guy/lcd
 import drivers
-import argparse
 import subprocess
 import json
 import signal
@@ -13,10 +12,10 @@ from logging import config
 import lockfile
 import socket
 from queue import Queue
+import threading
 from threading import Thread
-from _thread import *
 import daemon, daemon.pidfile
-from time import perf_counter as pc
+from time import perf_counter as pc, sleep
 
 socket_path = "/var/run"
 
@@ -52,7 +51,9 @@ LOGGING = {
 
 
 def shutdown(signal, frame):
-    logger.debug('Shutting down!')
+    logger.info('Shutting down!')
+    for thread in threading.enumerate():
+        thread.kill()
     display = drivers.Lcd()
     display.lcd_backlight(0)
     display.lcd_clear()
@@ -66,17 +67,17 @@ def get_my_ip():
     #print(ip)
     return ip[0]['addr_info'][0]['local']
 
-def lcd_manager_writer(queue, display, logger):
+def lcd_manager_writer(data, display, logger):
     mydict = {}
     try:
-        mydict = json.loads(queue.get(block=False))
+        mydict = json.loads(data)
     except:
-        logger.error("Malformed data")
+        logger.info("Malformed data %s" % mydict)
         return
     display.lcd_clear()
     display.lcd_backlight(1)
-    display.lcd_display_string(mydict[0], 1)
-    display.lcd_display_string(mydict[1], 2)
+    long_string(display,mydict[0], 1)
+    long_string(display,mydict[1], 2)
 
 def init_screen(display):
     display.lcd_backlight(0)
@@ -86,18 +87,40 @@ def init_screen(display):
 
 
 def handle_conn(logger,server,myQueue):
-    connection, client_address = server.accept()
-    logger.info('Connection from %s' % str(connection).split(", ")[0][-4:])
-    while True:
-        data = connection.recv(1024)
-        if not data:
-            break
-        logger.debug('Received data: %s' % data.decode('utf-8'))
-        myQueue.put(data)
-        # Send a response back to the client
-        response = 'ack!'
-        connection.sendall(response.encode())
-    connection.close()
+    try:
+        connection, client_address = server.accept()
+        logger.info('Connection from %s' % str(connection).split(", ")[0][-4:])
+        while True:
+            data = connection.recv(1024)
+            if not data:
+                break
+            logger.info('Received data: %s' % data.decode('utf-8'))
+            myQueue.put(data)
+            # Send a response back to the client
+            response = 'ack!'
+            connection.sendall(response.encode())
+        connection.close()
+    except:
+        logger.exception()
+        connection.close()
+
+
+
+def long_string(display, text='', num_line=1, num_cols=16):
+    """
+    Parameters: (driver, string to print, number of line to print, number of columns of your display)
+    Return: This function send to display your scrolling string.
+    """
+    if len(text) > num_cols:
+        display.lcd_display_string(text[:num_cols], num_line)
+        sleep(1)
+        for i in range(len(text) - num_cols + 1):
+            text_to_print = text[i:i+num_cols]
+            display.lcd_display_string(text_to_print, num_line)
+            sleep(0.2)
+        sleep(1)
+    else:
+        display.lcd_display_string(text, num_line)
 
 def main():
     config.dictConfig(LOGGING)
@@ -129,7 +152,7 @@ def main():
             connThread = Thread(target=handle_conn,args=(logger,server,myq,))
             connThread.start()
 
-        logger.debug("Timeout: %d" % int(pc() - last_screen_message))
+        #logger.debug("Timeout: %d" % int(pc() - last_screen_message))
         if int(pc() - last_screen_message) >= timeout:
             logger.info("Timeout clearing screen...")
             init_screen(display)
@@ -137,13 +160,13 @@ def main():
 
         if not myq.empty():
             try:
-                start_new_thread(lcd_manager_writer, (myq,display,logger))
+                writerThread = Thread(target=lcd_manager_writer, args=(myq.get(),display,logger))
+                writerThread.start()
                 last_screen_message = pc()
             except Exception as ex:
                 logging.exception("aaa")
 
-        # remove the socket file
-    os.unlink(mysocket)
+        sleep(1)
 
 if __name__ == '__main__':
     myname = os.path.basename(sys.argv[0])
@@ -151,6 +174,7 @@ if __name__ == '__main__':
         # Delete the leftover socket (if it exists)
         os.unlink('/var/run/%s' % myname)
         print("Deleting /var/run/%s" % myname)
+        os.unlink('/var/run/%s.pid' % myname)
     except:
         pass
 
@@ -159,6 +183,5 @@ if __name__ == '__main__':
             signal_map={
                 signal.SIGTERM: shutdown,
                 signal.SIGTSTP: shutdown
-                }
-            ):
+                }):
         main()

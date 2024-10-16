@@ -24,13 +24,13 @@ case "$1" in
     #log_use_fancy_output
 	log_daemon_msg "Starting $DESC" "$NAME"
     #start-stop-daemon --start --quiet --pidfile /var/run/$NAME --exec $DAEMON
-    start-stop-daemon --start --pidfile /var/run/${EXECNAME}.pid --exec $DAEMON
+    start-stop-daemon --start --exec $DAEMON
 	log_end_msg $?
 	;;
   stop)
     log_use_fancy_output
 	log_daemon_msg "Stopping $DESC" "$NAME"
-	start-stop-daemon --stop --quiet --pidfile /var/run/${EXECNAME}.pid
+	start-stop-daemon --stop --quiet --retry TERM/5/KILL/5 --pidfile /var/run/${EXECNAME}.pid
 	log_end_msg $?
 	;;
   restart|force-reload)

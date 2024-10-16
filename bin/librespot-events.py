@@ -102,6 +102,7 @@ server_address = '/var/run/lcdmanager.py'
 
 try:
     sock.connect(server_address)
+    sock.settimeout(10)
 except:
     logger.exception("Can't connect")
 
@@ -128,7 +129,10 @@ elif player_event in ['playing', 'changed', 'started']:
     #long_string(display,artist.rstrip(),1)
     #long_string(display,spot_res['name'],2)
     data = '["%s","%s"]' % (artist.rstrip(), spot_res['name'])
-    sock.sendall(str.encode(data))
+    try:
+        sock.sendall(str.encode(data))
+    except:
+        logger.exception()
 
 elif player_event in ['preloading']:
     pass
