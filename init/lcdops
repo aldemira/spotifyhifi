@@ -30,7 +30,7 @@ case "$1" in
   stop)
     log_use_fancy_output
 	log_daemon_msg "Stopping $DESC" "$NAME"
-	start-stop-daemon --stop --quite --pidfile /var/run/${EXECNAME}.pid
+	start-stop-daemon --stop --quiet --pidfile /var/run/${EXECNAME}.pid
 	log_end_msg $?
 	;;
   restart|force-reload)

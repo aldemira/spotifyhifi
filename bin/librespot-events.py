@@ -66,11 +66,11 @@ LOGGING = {
             },
         },
     'handlers': {
-        'stdout': {
-            'class': 'logging.StreamHandler',
-            'stream': sys.stdout,
-            'formatter': 'verbose',
-            },
+        #'stdout': {
+        #    'class': 'logging.StreamHandler',
+        #    'stream': sys.stdout,
+        #    'formatter': 'verbose',
+        #    },
         'daemon': {
             'class': 'logging.handlers.SysLogHandler',
             'address': '/dev/log',
@@ -80,7 +80,7 @@ LOGGING = {
         },
     'loggers': {
         'librespot-events': {
-            'handlers': ['daemon', 'sysout'],
+            'handlers': ['daemon',],
             'level': logging.INFO,
             'propagate': True,
             },
@@ -106,7 +106,7 @@ except:
     logger.exception("Can't connect")
 
 if player_event in ['stopped', 'paused']:
-    sock.sendall('["Aldemir HiFi","Stopped..."]')
+    sock.sendall(b'["Aldemir HiFi","Stopped..."]')
 elif player_event in ['playing', 'changed', 'started']:
     cur_track = os.environ['TRACK_ID']
     logger.info('New track: ' + cur_track)
@@ -127,7 +127,8 @@ elif player_event in ['playing', 'changed', 'started']:
 
     #long_string(display,artist.rstrip(),1)
     #long_string(display,spot_res['name'],2)
-    sock.sendall('["%s","%s"]' % (artist.rstrip(), spot_res['name']))
+    data = '["%s","%s"]' % (artist.rstrip(), spot_res['name'])
+    sock.sendall(str.encode(data))
 
 elif player_event in ['preloading']:
     pass

@@ -16,6 +16,7 @@ from queue import Queue
 #from threading import Thread
 from _thread import *
 import daemon, daemon.pidfile
+from time import perf_counter as pc
 
 socket_path = "/var/run"
 
@@ -79,14 +80,18 @@ def lcd_manager_writer(queue, display):
     display.lcd_display_string(mydict[0], 1)
     display.lcd_display_string(mydict[1], 2)
 
-def main():
-    logger.info('Starting up...')
-
-    display = drivers.Lcd()
+def init_screen(display):
     display.lcd_backlight(0)
 
     display.lcd_display_string("Aldemir HiFi...",1)
     display.lcd_display_string(get_my_ip(),2)
+
+def main():
+    timeout = 1800
+    logger.info('Starting up...')
+
+    display = drivers.Lcd()
+    init_screen(display)
 
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     # TODO change this os.path.basename thingy
@@ -94,8 +99,12 @@ def main():
     server.bind(mysocket)
     server.listen(1)
 
+    last_screen_message = pc()
+
     logger.info('Server is listening for incoming connections...')
     while True:
+        if last_screen_message - pc() >= timeout:
+            init_screen(display)
         connection, client_address = server.accept()
 
         myq = Queue()
@@ -114,6 +123,7 @@ def main():
                 break
             logger.debug('Received data: %s' % data.decode('utf-8'))
             myq.put(data)
+            last_screen_message = pc()
 
             # Send a response back to the client
             response = 'ack!'
