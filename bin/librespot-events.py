@@ -142,4 +142,4 @@ received_data = sock.recv(1024)
 sock.close()
 
 # process the received data
-print(received_data.decode())
+logger.debug(received_data.decode())

@@ -13,7 +13,7 @@ from logging import config
 import lockfile
 import socket
 from queue import Queue
-#from threading import Thread
+from threading import Thread
 from _thread import *
 import daemon, daemon.pidfile
 from time import perf_counter as pc
@@ -50,8 +50,6 @@ LOGGING = {
         }
     }
 
-config.dictConfig(LOGGING)
-logger = logging.getLogger("aldemir-hifi")
 
 def shutdown(signal, frame):
     logger.debug('Shutting down!')
@@ -68,7 +66,7 @@ def get_my_ip():
     #print(ip)
     return ip[0]['addr_info'][0]['local']
 
-def lcd_manager_writer(queue, display):
+def lcd_manager_writer(queue, display, logger):
     mydict = {}
     try:
         mydict = json.loads(queue.get(block=False))
@@ -86,7 +84,24 @@ def init_screen(display):
     display.lcd_display_string("Aldemir HiFi...",1)
     display.lcd_display_string(get_my_ip(),2)
 
+
+def handle_conn(logger,server,myQueue):
+    connection, client_address = server.accept()
+    logger.info('Connection from %s' % str(connection).split(", ")[0][-4:])
+    while True:
+        data = connection.recv(1024)
+        if not data:
+            break
+        logger.debug('Received data: %s' % data.decode('utf-8'))
+        myQueue.put(data)
+        # Send a response back to the client
+        response = 'ack!'
+        connection.sendall(response.encode())
+    connection.close()
+
 def main():
+    config.dictConfig(LOGGING)
+    logger = logging.getLogger("aldemir-hifi")
     timeout = 1800
     logger.info('Starting up...')
 
@@ -101,34 +116,32 @@ def main():
 
     last_screen_message = pc()
 
+    myq = Queue()
     logger.info('Server is listening for incoming connections...')
+
+    connThread = Thread(target=handle_conn,args=(logger,server,myq,))
+    connThread.start()
+    # Main server loop
     while True:
-        if last_screen_message - pc() >= timeout:
+        # Connection handling
+        if not connThread.is_alive():
+            logger.info("Starting connection thread")
+            connThread = Thread(target=handle_conn,args=(logger,server,myq,))
+            connThread.start()
+
+        logger.debug("Timeout: %d" % int(pc() - last_screen_message))
+        if int(pc() - last_screen_message) >= timeout:
+            logger.info("Timeout clearing screen...")
             init_screen(display)
-        connection, client_address = server.accept()
-
-        myq = Queue()
-
-        logger.info('Connection from %s' % str(connection).split(", ")[0][-4:])
-
-        # receive data from the client
-        while True:
-            if not myq.empty():
-                try:
-                    start_new_thread(lcd_manager_writer, (myq,display,))
-                except Exception as ex:
-                    logging.exception("aaa")
-            data = connection.recv(1024)
-            if not data:
-                break
-            logger.debug('Received data: %s' % data.decode('utf-8'))
-            myq.put(data)
             last_screen_message = pc()
 
-            # Send a response back to the client
-            response = 'ack!'
-            connection.sendall(response.encode())
-        connection.close()
+        if not myq.empty():
+            try:
+                start_new_thread(lcd_manager_writer, (myq,display,logger))
+                last_screen_message = pc()
+            except Exception as ex:
+                logging.exception("aaa")
+
         # remove the socket file
     os.unlink(mysocket)
 
@@ -137,9 +150,10 @@ if __name__ == '__main__':
     try:
         # Delete the leftover socket (if it exists)
         os.unlink('/var/run/%s' % myname)
-        logger.info("Deleting /var/run/%s" % myname)
+        print("Deleting /var/run/%s" % myname)
     except:
         pass
+
     with daemon.DaemonContext(
             pidfile=daemon.pidfile.TimeoutPIDLockFile('/var/run/%s.pid' % myname),
             signal_map={
