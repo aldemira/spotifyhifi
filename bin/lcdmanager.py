@@ -18,6 +18,7 @@ import daemon, daemon.pidfile
 from time import perf_counter as pc, sleep
 
 socket_path = "/var/run"
+thread_local = threading.local()
 
 LOGGING = {
     'version': 1,
@@ -50,11 +51,16 @@ LOGGING = {
     }
 
 
+def get_display():
+    if not hasattr(thread_local, "display"):
+        thread_local.display = drivers.Lcd()
+    return thread_local.display
+
 def shutdown(signal, frame):
     logger.info('Shutting down!')
     for thread in threading.enumerate():
         thread.kill()
-    display = drivers.Lcd()
+    display = get_display()
     display.lcd_backlight(0)
     display.lcd_clear()
     os.unlink(socket_path + '/' + os.path.basename(sys.argv[0]))
@@ -106,6 +112,7 @@ def handle_conn(logger,server,myQueue):
 
 
 
+# Also pulled from https://github.com/the-raspberry-pi-guy/lcd
 def long_string(display, text='', num_line=1, num_cols=16):
     """
     Parameters: (driver, string to print, number of line to print, number of columns of your display)
@@ -128,7 +135,7 @@ def main():
     timeout = 1800
     logger.info('Starting up...')
 
-    display = drivers.Lcd()
+    display = get_display()
     init_screen(display)
 
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
