@@ -54,6 +54,21 @@ def get_track(track_id, access_token):
         return spot_res
     else:
         return None
+def create_connection():
+    # create a socket object
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+
+    # connect to the Unix domain socket server
+    server_address = '/var/run/lcdmanager.py'
+
+    try:
+        sock.connect(server_address)
+        sock.settimeout(10)
+    except:
+        logger.exception("Can't connect")
+        sys.exit(1)
+
+    return sock
 
 ######################## END HELPER FUNCTIONS ##########################
 
@@ -94,20 +109,19 @@ if not player_event:
     print('Please provide an event!')
     logger.error('Please provide an event!')
     sys.exit(1)
-# create a socket object
-sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-
-# connect to the Unix domain socket server
-server_address = '/var/run/lcdmanager.py'
-
-try:
-    sock.connect(server_address)
-    sock.settimeout(10)
-except:
-    logger.exception("Can't connect")
 
 if player_event in ['stopped', 'paused']:
+    sock = create_connection()
     sock.sendall(b'["Aldemir HiFi","Stopped..."]')
+    # receive data from the server
+    received_data = sock.recv(1024)
+
+    # close the socket
+    sock.close()
+
+    # process the received data
+    logger.debug(received_data.decode())
+
 elif player_event in ['playing', 'changed', 'started']:
     cur_track = os.environ['TRACK_ID']
     logger.info('New track: ' + cur_track)
@@ -129,21 +143,21 @@ elif player_event in ['playing', 'changed', 'started']:
     #long_string(display,artist.rstrip(),1)
     #long_string(display,spot_res['name'],2)
     data = '["%s","%s"]' % (artist.rstrip(), spot_res['name'])
+    sock = create_connection()
     try:
         sock.sendall(str.encode(data))
     except:
         logger.exception()
 
+    # receive data from the server
+    received_data = sock.recv(1024)
+
+    # close the socket
+    sock.close()
+
+    # process the received data
+    logger.debug(received_data.decode())
 elif player_event in ['preloading']:
     pass
 else:
     logger.debug('Received unhandled event')
-
-# receive data from the server
-received_data = sock.recv(1024)
-
-# close the socket
-sock.close()
-
-# process the received data
-logger.debug(received_data.decode())
