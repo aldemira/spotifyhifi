@@ -19,6 +19,7 @@ from time import perf_counter as pc, sleep
 
 socket_path = "/var/run"
 thread_local = threading.local()
+display_lock = threading.Lock()
 
 LOGGING = {
     'version': 1,
@@ -83,6 +84,9 @@ def lcd_manager_writer(data, logger):
         display.write_lcd(0, 1, get_my_ip())
         return
 
+    # Scrolling takes time, and librespot might send the same
+    # song details again.
+    display_lock.acquire()
     mydict = {}
     try:
         mydict = json.loads(data)
@@ -96,6 +100,7 @@ def lcd_manager_writer(data, logger):
     long_string(display,mydict[1], 1)
     #display.write_lcd(0, 0, mydict[0][:16])
     #display.write_lcd(0, 1, mydict[1][:16])
+    display_lock.release()
 
 
 def handle_conn(logger,server,myQueue):
