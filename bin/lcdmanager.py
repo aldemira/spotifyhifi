@@ -86,12 +86,13 @@ def lcd_manager_writer(data, logger):
 
     # Scrolling takes time, and librespot might send the same
     # song details again.
-    display_lock.acquire()
+    display_lock.acquire(timeout=30)
     mydict = {}
     try:
         mydict = json.loads(data)
     except:
         logger.info("Malformed data %s" % mydict)
+        display_lock.release()
         return
     display.home()
     display.clear()
@@ -180,6 +181,7 @@ def main():
 
         if not myq.empty():
             try:
+                logger.info("Starting display thread")
                 writerThread = Thread(target=lcd_manager_writer, args=(myq.get(),logger))
                 writerThread.start()
                 last_screen_message = pc()

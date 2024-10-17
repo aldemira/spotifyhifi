@@ -104,6 +104,7 @@ LOGGING = {
 
 config.dictConfig(LOGGING)
 logger = logging.getLogger("librespot-events")
+logger.info("Starting up.")
 player_event = os.getenv('PLAYER_EVENT')
 if not player_event:
     print('Please provide an event!')
