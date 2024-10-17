@@ -13,7 +13,7 @@ DAEMON=/usr/local/bin/librespot
 [ -x "$DAEMON" ] || exit 0
 NAME=librespot
 DESC="spotify library"
-LIBRESPOT_OPTS="--name Philips --device-type speaker --backend alsa --bitrate 160 --format S16 --disable-audio-cache --volume-ctrl linear --initial-volume 90 --autoplay --onevent /opt/lcdworks/bin/librespot-events.py"
+LIBRESPOT_OPTS="--name Philips --device-type speaker --backend alsa --bitrate 160 --format S16 --disable-audio-cache --initial-volume 99 --autoplay --onevent /opt/lcdworks/bin/librespot-events.py"
 . /lib/init/vars.sh
 
 . /lib/lsb/init-functions

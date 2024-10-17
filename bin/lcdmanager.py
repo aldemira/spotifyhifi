@@ -2,8 +2,8 @@
 
 import sys,os
 sys.path.append(os.path.abspath("/opt/lcdworks/lib"))
-# Get this from https://github.com/the-raspberry-pi-guy/lcd
-import drivers
+# Get this from https://github.com/lyz508/python-i2c-lcd
+from LCD import LCD
 import subprocess
 import json
 import signal
@@ -53,7 +53,7 @@ LOGGING = {
 
 def get_display():
     if not hasattr(thread_local, "display"):
-        thread_local.display = drivers.Lcd()
+        thread_local.display = LCD()
     return thread_local.display
 
 def shutdown(signal, frame):
@@ -73,23 +73,29 @@ def get_my_ip():
     #print(ip)
     return ip[0]['addr_info'][0]['local']
 
-def lcd_manager_writer(data, display, logger):
+def lcd_manager_writer(data, logger):
+    display = get_display()
+    # Calling this thread with no data indicates that the screen will
+    # show a generic message
+    if not data:
+        display.no_backlight()
+        display.write_lcd(0, 0, "Aldemir HiFi...")
+        display.write_lcd(0, 1, get_my_ip())
+        return
+
     mydict = {}
     try:
         mydict = json.loads(data)
     except:
         logger.info("Malformed data %s" % mydict)
         return
-    display.lcd_clear()
-    display.lcd_backlight(1)
-    long_string(display,mydict[0], 1)
-    long_string(display,mydict[1], 2)
-
-def init_screen(display):
-    display.lcd_backlight(0)
-
-    display.lcd_display_string("Aldemir HiFi...",1)
-    display.lcd_display_string(get_my_ip(),2)
+    display.home()
+    display.clear()
+    display.backlight()
+    long_string(display,mydict[0], 0)
+    long_string(display,mydict[1], 1)
+    #display.write_lcd(0, 0, mydict[0][:16])
+    #display.write_lcd(0, 1, mydict[1][:16])
 
 
 def handle_conn(logger,server,myQueue):
@@ -113,21 +119,22 @@ def handle_conn(logger,server,myQueue):
 
 
 # Also pulled from https://github.com/the-raspberry-pi-guy/lcd
-def long_string(display, text='', num_line=1, num_cols=16):
-    """
-    Parameters: (driver, string to print, number of line to print, number of columns of your display)
-    Return: This function send to display your scrolling string.
-    """
+def long_string(display, text='', num_line=0, num_cols=16):
     if len(text) > num_cols:
-        display.lcd_display_string(text[:num_cols], num_line)
+        display.write_lcd(0, num_line, text[:num_cols])
         sleep(1)
         for i in range(len(text) - num_cols + 1):
             text_to_print = text[i:i+num_cols]
-            display.lcd_display_string(text_to_print, num_line)
+            display.write_lcd(0, num_line, text_to_print)
             sleep(0.2)
-        sleep(1)
+        sleep(0.5)
+        for i in reversed(range(len(text) - num_cols + 1)):
+            text_to_print = text[i:i+num_cols]
+            display.write_lcd(0, num_line, text_to_print)
+            sleep(0.2)
+        #display.write_lcd(0, num_line, text[:num_cols])
     else:
-        display.lcd_display_string(text, num_line)
+        display.write_lcd(0, num_line, text)
 
 def main():
     config.dictConfig(LOGGING)
@@ -135,8 +142,8 @@ def main():
     timeout = 1800
     logger.info('Starting up...')
 
-    display = get_display()
-    init_screen(display)
+    writerThread = Thread(target=lcd_manager_writer, args=(None,logger))
+    writerThread.start()
 
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     # TODO change this os.path.basename thingy
@@ -162,12 +169,13 @@ def main():
         #logger.debug("Timeout: %d" % int(pc() - last_screen_message))
         if int(pc() - last_screen_message) >= timeout:
             logger.info("Timeout clearing screen...")
-            init_screen(display)
+            writerThread = Thread(target=lcd_manager_writer, args=(None,logger))
+            writerThread.start()
             last_screen_message = pc()
 
         if not myq.empty():
             try:
-                writerThread = Thread(target=lcd_manager_writer, args=(myq.get(),display,logger))
+                writerThread = Thread(target=lcd_manager_writer, args=(myq.get(),logger))
                 writerThread.start()
                 last_screen_message = pc()
             except Exception as ex:

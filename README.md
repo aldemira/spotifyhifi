@@ -1,9 +1,15 @@
-A threaded, raspberrypi based lcdmanager. Catches librespot events and shows them on 2x16 LCD. 
+A threaded, raspberrypi based lcdmanager. Catches librespot events and displays them on a 2x16 LCD. 
 
-Only dependencies is python-daemon. And drivers.py from https://github.com/the-raspberry-pi-guy/lcd 
+Only dependencies are python-daemon files from https://github.com/lyz508/python-i2c-lcd (Which requires python3-smbus2)
 
-Add config file as
-   { 
-      "client_id": "slkdsdlkjflsd",
-      "client_secret": "dlkfjdljfldjfd"
-   }
+Add a config file as
+    ```
+       { 
+          "client_id": "slkdsdlkjflsd",
+          "client_secret": "dlkfjdljfldjfd"
+       }
+    ```
+
+under conf directory
+
+
