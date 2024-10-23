@@ -9,13 +9,14 @@ import json
 import signal
 import logging
 from logging import config
-import lockfile
 import socket
 from queue import Queue
 import threading
 from threading import Thread
 import daemon, daemon.pidfile
 from time import perf_counter as pc, sleep
+import configparser
+import argparse
 
 socket_path = "/var/run"
 thread_local = threading.local()
@@ -51,7 +52,6 @@ LOGGING = {
         }
     }
 
-
 def get_display():
     if not hasattr(thread_local, "display"):
         thread_local.display = LCD()
@@ -74,33 +74,37 @@ def get_my_ip():
     #print(ip)
     return ip[0]['addr_info'][0]['local']
 
-def lcd_manager_writer(data, logger):
+def lcd_manager_writer(data, logger, action=None):
     display = get_display()
-    # Calling this thread with no data indicates that the screen will
-    # show a generic message
-    if not data:
+    display_lock.acquire(timeout=30)
+
+    if action == 'screen_reset':
+        logger.info("Resetting screen")
         display.no_backlight()
         display.write_lcd(0, 0, "Aldemir HiFi...")
         display.write_lcd(0, 1, get_my_ip())
         return
-
-    # Scrolling takes time, and librespot might send the same
-    # song details again.
-    display_lock.acquire(timeout=30)
-    mydict = {}
-    try:
-        mydict = json.loads(data)
-    except:
-        logger.info("Malformed data %s" % mydict)
-        display_lock.release()
-        return
-    display.home()
-    display.clear()
-    display.backlight()
-    long_string(display,mydict[0], 0)
-    long_string(display,mydict[1], 1)
-    #display.write_lcd(0, 0, mydict[0][:16])
-    #display.write_lcd(0, 1, mydict[1][:16])
+    elif action == 'write_msg':
+        # Scrolling takes time, and librespot might send the same
+        # song details again.
+        mydict = {}
+        # TODO use ['spotify'] or some other dict for recived msgs
+        try:
+            mydict = json.loads(data)
+        except:
+            logger.info("Malformed data %s" % mydict)
+            display_lock.release()
+            return
+        display.home()
+        display.clear()
+        display.backlight()
+        long_string(display,mydict[0], 0)
+        long_string(display,mydict[1], 1)
+        #display.write_lcd(0, 0, mydict[0][:16])
+        #display.write_lcd(0, 1, mydict[1][:16])
+    elif action == 'screen_dim':
+        logger.info("Dimming screen")
+        display.no_backlight()
     display_lock.release()
 
 
@@ -145,10 +149,10 @@ def long_string(display, text='', num_line=0, num_cols=16):
 def main():
     config.dictConfig(LOGGING)
     logger = logging.getLogger("aldemir-hifi")
-    timeout = 1800
+    timeout = thread_local.screen_off * 60
     logger.info('Starting up...')
 
-    writerThread = Thread(target=lcd_manager_writer, args=(None,logger))
+    writerThread = Thread(target=lcd_manager_writer, args=(None,logger,'screen_reset'))
     writerThread.start()
 
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -158,6 +162,7 @@ def main():
     server.listen(1)
 
     last_screen_message = pc()
+    screen_on_time = pc()
 
     myq = Queue()
     logger.info('Server is listening for incoming connections...')
@@ -173,21 +178,25 @@ def main():
             connThread.start()
 
         #logger.debug("Timeout: %d" % int(pc() - last_screen_message))
-        if int(pc() - last_screen_message) >= timeout:
+        if int(pc() - last_screen_message) >= int(timeout):
             logger.info("Timeout clearing screen...")
-            writerThread = Thread(target=lcd_manager_writer, args=(None,logger))
+            writerThread = Thread(target=lcd_manager_writer, args=(None,logger,'screen_reset'))
             writerThread.start()
             last_screen_message = pc()
 
         if not myq.empty():
             try:
                 logger.info("Starting display thread")
-                writerThread = Thread(target=lcd_manager_writer, args=(myq.get(),logger))
+                writerThread = Thread(target=lcd_manager_writer, args=(myq.get(),logger,'write_msg'))
                 writerThread.start()
                 last_screen_message = pc()
+                screen_on_time = pc()
             except Exception as ex:
                 logging.exception("aaa")
 
+        if int(pc() - screen_on_time) >= int(thread_local.screen_dim):
+            writerThread = Thread(target=lcd_manager_writer, args=(None,logger,'screen_dim'))
+            writerThread.start()
         sleep(1)
 
 if __name__ == '__main__':
@@ -199,6 +208,32 @@ if __name__ == '__main__':
         os.unlink('/var/run/%s.pid' % myname)
     except:
         pass
+
+    parser = argparse.ArgumentParser(description='Display current song&artist from spotify on a 2x16 LCD',add_help=True)
+    parser.add_argument('-f',nargs=1,help='Path to the config file',required=False,metavar='/etc/lcdworks.conf')
+    args = parser.parse_args()
+
+    if os.path.isfile(args.f[0]):
+        CONFIG_FILE = args.f[0]
+
+        lcdworks_config = configparser.ConfigParser()
+        with open(CONFIG_FILE, 'r') as f:
+            config_string = '[lcd]\n' + f.read()
+
+        lcdworks_config.read_string(config_string)
+        config_val = lcdworks_config['lcd']
+
+        thread_local.screen_dim = config_val.get('screen_dim',30)
+        thread_local.screen_off = config_val.get('screen_off',10)
+        thread_local.screen_msg = config_val.get('screen_msg','')
+    else:
+        print('Config file is not accessible!')
+        print('Using default values')
+
+        thread_local.screen_dim = 30
+        thread_local.screen_off = 10
+        thread_local.screen_msg = ''
+
 
     with daemon.DaemonContext(
             pidfile=daemon.pidfile.TimeoutPIDLockFile('/var/run/%s.pid' % myname),

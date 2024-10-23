@@ -9,9 +9,10 @@
 # Description:       Starts or stops the lcdops program
 ### END INIT INFO
 
-LCDWORKSDIR=/opt/lcdworks/bin/
+LCDWORKSDIR=/opt/lcdworks
 EXECNAME=lcdmanager.py
-DAEMON=${LCDWORKSDIR}${EXECNAME}
+DAEMON=${LCDWORKSDIR}/bin/${EXECNAME}
+DAEMON_OPTS="-f ${LCDWORKSDIR}/conf/lcdworks.conf"
 [ -x "$DAEMON" ] || exit 0
 NAME=lcdops
 DESC="aldemir HiFi lcdops"
@@ -24,7 +25,7 @@ case "$1" in
     #log_use_fancy_output
 	log_daemon_msg "Starting $DESC" "$NAME"
     #start-stop-daemon --start --quiet --pidfile /var/run/$NAME --exec $DAEMON
-    start-stop-daemon --start --exec $DAEMON
+    start-stop-daemon --start --exec $DAEMON -- $DAEMON_OPTS
 	log_end_msg $?
 	;;
   stop)
