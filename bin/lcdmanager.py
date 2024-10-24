@@ -150,8 +150,9 @@ def long_string(display, text='', num_line=0, num_cols=16):
 def main():
     config.dictConfig(LOGGING)
     logger = logging.getLogger("aldemir-hifi")
-    timeout = thread_local.screen_off * 60
-    logger.info('Starting up...')
+    timeout = int(thread_local.screen_off) * 60
+    logger.info('Starting lcdmanager')
+    logger.info('Will clear the screen after %s minutes' % thread_local.screen_off)
 
     writerThread = Thread(target=lcd_manager_writer, args=(None,logger,'screen_reset'))
     writerThread.start()
