@@ -62,8 +62,8 @@ def shutdown(signal, frame):
     for thread in threading.enumerate():
         thread.kill()
     display = get_display()
-    display.lcd_backlight(0)
-    display.lcd_clear()
+    display.no_backlight()
+    display.clear()
     os.unlink(socket_path + '/' + os.path.basename(sys.argv[0]))
     sys.exit(0)
 
@@ -75,8 +75,8 @@ def get_my_ip():
     return ip[0]['addr_info'][0]['local']
 
 def lcd_manager_writer(data, logger, action=None):
-    display = get_display()
     display_lock.acquire(timeout=30)
+    display = get_display()
 
     if action == 'screen_reset':
         logger.info("Resetting screen")
@@ -85,6 +85,7 @@ def lcd_manager_writer(data, logger, action=None):
         display.write_lcd(0, 1, get_my_ip())
         return
     elif action == 'write_msg':
+        thread_local.screen_light = True
         # Scrolling takes time, and librespot might send the same
         # song details again.
         mydict = {}
@@ -92,19 +93,20 @@ def lcd_manager_writer(data, logger, action=None):
         try:
             mydict = json.loads(data)
         except:
-            logger.info("Malformed data %s" % mydict)
+            logger.info("Malformed data %s" % data)
             display_lock.release()
             return
         display.home()
         display.clear()
         display.backlight()
-        long_string(display,mydict[0], 0)
-        long_string(display,mydict[1], 1)
-        #display.write_lcd(0, 0, mydict[0][:16])
-        #display.write_lcd(0, 1, mydict[1][:16])
+        long_string(display,mydict['hifi']['artist'], 0)
+        long_string(display,mydict['hifi']['track'], 1)
     elif action == 'screen_dim':
         logger.info("Dimming screen")
-        display.no_backlight()
+        thread_local.screen_light = False
+        #display.no_backlight()
+        # TODO this just clears everything
+        pass
     display_lock.release()
 
 
@@ -142,7 +144,6 @@ def long_string(display, text='', num_line=0, num_cols=16):
             text_to_print = text[i:i+num_cols]
             display.write_lcd(0, num_line, text_to_print)
             sleep(0.2)
-        #display.write_lcd(0, num_line, text[:num_cols])
     else:
         display.write_lcd(0, num_line, text)
 
@@ -195,8 +196,11 @@ def main():
                 logging.exception("aaa")
 
         if int(pc() - screen_on_time) >= int(thread_local.screen_dim):
-            writerThread = Thread(target=lcd_manager_writer, args=(None,logger,'screen_dim'))
-            writerThread.start()
+            if thread_local.screen_light:
+                pass
+                #writerThread = Thread(target=lcd_manager_writer, args=(None,logger,'screen_dim'))
+                #writerThread.start()
+            screen_on_time = pc()
         sleep(1)
 
 if __name__ == '__main__':
@@ -234,6 +238,8 @@ if __name__ == '__main__':
         thread_local.screen_off = 10
         thread_local.screen_msg = ''
 
+
+    thread_local.screen_light = False
 
     with daemon.DaemonContext(
             pidfile=daemon.pidfile.TimeoutPIDLockFile('/var/run/%s.pid' % myname),

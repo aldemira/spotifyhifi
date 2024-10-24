@@ -54,7 +54,8 @@ def get_track(track_id, access_token):
         return spot_res
     else:
         return None
-def create_connection():
+
+def send_data(logger,payload):
     # create a socket object
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
@@ -68,7 +69,18 @@ def create_connection():
         logger.exception("Can't connect")
         sys.exit(1)
 
-    return sock
+    try:
+        sock.sendall(str.encode(json.dumps(payload)))
+    except:
+        logger.exception("Can't send payload")
+
+    # receive data from the server
+    received_data = sock.recv(1024)
+    logger.info(received_data.decode())
+
+    # close the socket
+    sock.close()
+
 
 ######################## END HELPER FUNCTIONS ##########################
 
@@ -106,22 +118,19 @@ config.dictConfig(LOGGING)
 logger = logging.getLogger("librespot-events")
 logger.info("Starting up.")
 player_event = os.getenv('PLAYER_EVENT')
+logger.info("Recieved event: %s" % player_event)
+payload = {}
+payload['hifi'] = {}
+
 if not player_event:
     print('Please provide an event!')
     logger.error('Please provide an event!')
     sys.exit(1)
 
 if player_event in ['stopped', 'paused']:
-    sock = create_connection()
-    sock.sendall(b'["Aldemir HiFi","Stopped..."]')
-    # receive data from the server
-    received_data = sock.recv(1024)
-
-    # close the socket
-    sock.close()
-
-    # process the received data
-    logger.debug(received_data.decode())
+    payload['hifi']['artist'] = "Aldemir Hifi"
+    payload['hifi']['track'] = "Paused"
+    send_data(logger,payload)
 
 elif player_event in ['playing', 'changed', 'started']:
     cur_track = os.environ['TRACK_ID']
@@ -143,21 +152,14 @@ elif player_event in ['playing', 'changed', 'started']:
 
     #long_string(display,artist.rstrip(),1)
     #long_string(display,spot_res['name'],2)
-    data = '["%s","%s"]' % (artist.rstrip(), spot_res['name'])
-    sock = create_connection()
-    try:
-        sock.sendall(str.encode(data))
-    except:
-        logger.exception()
+    payload['hifi']['artist'] = artist.rstrip()
+    payload['hifi']['track'] = spot_res['name'].replace('"','\"')
+    send_data(logger,payload)
 
-    # receive data from the server
-    received_data = sock.recv(1024)
-
-    # close the socket
-    sock.close()
-
-    # process the received data
-    logger.debug(received_data.decode())
+elif player_event == 'session_client_changed':
+    payload['hifi']['artist'] = 'Aldemir HiFi'
+    payload['hifi']['track'] = 'Disconnected'
+    send_data(logger,payload)
 elif player_event in ['preloading']:
     pass
 else:
