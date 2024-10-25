@@ -157,9 +157,10 @@ elif player_event in ['playing', 'changed', 'started']:
     send_data(logger,payload)
 
 elif player_event == 'session_client_changed':
-    payload['hifi']['artist'] = 'Aldemir HiFi'
-    payload['hifi']['track'] = 'Disconnected'
-    send_data(logger,payload)
+    #payload['hifi']['artist'] = 'Aldemir HiFi'
+    #payload['hifi']['track'] = 'Disconnected'
+    #send_data(logger,payload)
+    pass
 elif player_event in ['preloading']:
     pass
 else:

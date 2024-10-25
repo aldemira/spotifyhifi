@@ -242,6 +242,13 @@ if __name__ == '__main__':
 
     thread_local.screen_light = False
 
+    # Setup audio output as in 
+    # https://learn.adafruit.com/adding-basic-audio-ouput-to-raspberry-pi-zero?view=all
+    cmd = ['/usr/bin/gpio', '-g', 'mode', '12', 'alt0']
+    res = subprocess.run(cmd,check=True)
+    cmd = ['/usr/bin/gpio', '-g', 'mode', '13', 'alt0']
+    res = subprocess.run(cmd,check=True)
+
     with daemon.DaemonContext(
             pidfile=daemon.pidfile.TimeoutPIDLockFile('/var/run/%s.pid' % myname),
             signal_map={
