@@ -49,9 +49,12 @@ def get_track(track_id, access_token):
     )
 
     spot_res = response.json()
+    logger.info(spot_res)
 
     if response.status_code == 200:
         return spot_res
+    elif response.status_code == 401:
+        return { "response": "auth" }
     else:
         return None
 
@@ -122,6 +125,12 @@ logger.info("Recieved event: %s" % player_event)
 payload = {}
 payload['hifi'] = {}
 
+test = ''
+for name, value in os.environ.items():
+    test = test + "%s: %s; " % (name,value)
+
+logger.info("Env: %s" % test)
+
 if not player_event:
     print('Please provide an event!')
     logger.error('Please provide an event!')
@@ -138,12 +147,13 @@ elif player_event in ['playing', 'changed', 'started']:
 
     #cur_track = '1n7em6Nj2p0SS4S5QMY4Qr'
     spot_res = ''
-    with open('spotify_access_token.txt', 'w+') as f:
+    with open(root_path + '/conf/spotify_access_token.txt', 'w+') as f:
         access_token = f.read()
         spot_res = get_track(cur_track,access_token)
-        if not spot_res:
+        if spot_res == "auth":
             access_token = get_token()
         spot_res = get_track(cur_track,access_token)
+        f.seek(0)
         f.write(access_token)
 
     artist = ''
