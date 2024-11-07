@@ -35,6 +35,7 @@ def get_token():
         auth_res = response.json()
         return auth_res['access_token']
     else:
+        logger.info("Error during auth: %s" % response.content)
         return None
 
 def get_track(track_id, access_token):
@@ -49,11 +50,12 @@ def get_track(track_id, access_token):
     )
 
     spot_res = response.json()
-    logger.info(spot_res)
+    # logger.debug(spot_res)
 
-    if response.status_code == 200:
+    code = response.status_code
+    if code == 200:
         return spot_res
-    elif response.status_code == 401:
+    elif code == 401 or code == 400:
         return { "response": "auth" }
     else:
         return None
@@ -150,7 +152,10 @@ elif player_event in ['playing', 'changed', 'started']:
     with open(root_path + '/conf/spotify_access_token.txt', 'w+') as f:
         access_token = f.read()
         spot_res = get_track(cur_track,access_token)
-        if spot_res == "auth":
+        try:
+            if spot_res["response"] == "auth":
+                access_token = get_token()
+        except KeyError:
             access_token = get_token()
         spot_res = get_track(cur_track,access_token)
         f.seek(0)
