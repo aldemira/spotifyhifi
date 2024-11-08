@@ -165,6 +165,7 @@ def main():
 
     last_screen_message = pc()
     screen_on_time = pc()
+    screen_idle = True
 
     myq = Queue()
     logger.info('Server is listening for incoming connections...')
@@ -180,13 +181,15 @@ def main():
             connThread.start()
 
         #logger.debug("Timeout: %d" % int(pc() - last_screen_message))
-        if int(pc() - last_screen_message) >= int(timeout):
-            logger.info("Timeout clearing screen...")
+        if int(pc() - last_screen_message) >= int(timeout) and screen_idle == False:
+            logger.info("Timeout for clearing screen...")
             writerThread = Thread(target=lcd_manager_writer, args=(None,logger,'screen_reset'))
             writerThread.start()
             last_screen_message = pc()
+            screen_idle = True
 
         if not myq.empty():
+            screen_idle = False
             try:
                 logger.info("Starting display thread")
                 writerThread = Thread(target=lcd_manager_writer, args=(myq.get(),logger,'write_msg'))
