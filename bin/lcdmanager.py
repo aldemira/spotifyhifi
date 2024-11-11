@@ -81,7 +81,7 @@ def lcd_manager_writer(data, logger, action=None):
     if action == 'screen_reset':
         logger.info("Resetting screen")
         display.no_backlight()
-        display.write_lcd(0, 0, "Aldemir HiFi...")
+        display.write_lcd(0, 0, "Spectre HiFi...")
         display.write_lcd(0, 1, get_my_ip())
         return
     elif action == 'write_msg':

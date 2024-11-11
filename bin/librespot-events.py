@@ -139,7 +139,7 @@ if not player_event:
     sys.exit(1)
 
 if player_event in ['stopped', 'paused']:
-    payload['hifi']['artist'] = "Aldemir Hifi"
+    payload['hifi']['artist'] = "Spectre HiFi"
     payload['hifi']['track'] = "Paused"
     send_data(logger,payload)
 
@@ -172,7 +172,7 @@ elif player_event in ['playing', 'changed', 'started']:
     send_data(logger,payload)
 
 elif player_event == 'session_client_changed':
-    #payload['hifi']['artist'] = 'Aldemir HiFi'
+    #payload['hifi']['artist'] = 'Spectre HiFi'
     #payload['hifi']['track'] = 'Disconnected'
     #send_data(logger,payload)
     pass
